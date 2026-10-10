@@ -66,6 +66,19 @@ void ignition_can_hook(const CANPacket_t *msg) {
       }
       prev_counter_vw_meb = counter;
     }
+
+    // BluePilot: Ford exception (BodyInfo_3_FD1 / BodyInformation_3 at 0x3B3)
+    if ((msg->addr == 0x3B3U) && (len == 8)) {
+      uint8_t ign_status = (msg->data[0] >> 4U) & 0xFU;
+      if ((ign_status == 4U) || (ign_status == 8U)) {
+        ignition_can = true;
+        ignition_can_cnt = 0U;
+      } else if (ign_status == 1U) {
+        ignition_can = false;
+        ignition_can_cnt = 0U;
+      }
+    }
+    // End BluePilot
   }
 
   // TODO: this is too loose, Teslas have 0x222

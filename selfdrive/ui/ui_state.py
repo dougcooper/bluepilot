@@ -254,7 +254,11 @@ class Device(DeviceSP):
       return ui_state.custom_interactive_timeout
 
     ignition_timeout = 10 if gui_app.big_ui() else 5
-    return ignition_timeout if ui_state.ignition else 30
+    # BluePilot: extend offroad interactive timeout from 30s to 120s to prevent premature
+    # screen blanking while vehicle gateway/ECUs boot up
+    offroad_timeout = 120
+    return ignition_timeout if ui_state.ignition else offroad_timeout
+    # End BluePilot
 
   def _reset_interactive_timeout(self) -> None:
     self._interaction_time = time.monotonic() + self.interactive_timeout

@@ -32,6 +32,11 @@ struct HwmonState {
 
 HwmonState hwmon_state;
 
+// BluePilot: track software CAN ignition from Ford BodyInfo_3_FD1 (0x3B3)
+static std::atomic<bool> ford_can_ignition{false};
+static std::atomic<uint64_t> ford_can_ignition_time{0};
+// End BluePilot
+
 bool check_connected(Panda *panda) {
   if (!panda->connected()) {
     do_exit = true;
@@ -121,6 +126,18 @@ void can_recv(Panda *panda, PubMaster *pm) {
       canData[i].setAddress(raw_can_data[i].address);
       canData[i].setDat(kj::arrayPtr((uint8_t*)raw_can_data[i].dat.data(), raw_can_data[i].dat.size()));
       canData[i].setSrc(raw_can_data[i].src);
+
+      // BluePilot: parse Ford BodyInfo_3_FD1 (0x3B3) for ignition status on bus 0
+      if (raw_can_data[i].src == 0 && raw_can_data[i].address == 0x3B3 && raw_can_data[i].dat.size() >= 1) {
+        uint8_t ign_status = ((uint8_t)raw_can_data[i].dat[0] >> 4) & 0x0F;
+        if (ign_status == 4 || ign_status == 8) {
+          ford_can_ignition = true;
+          ford_can_ignition_time = nanos_since_boot();
+        } else if (ign_status == 1) {
+          ford_can_ignition = false;
+        }
+      }
+      // End BluePilot
     }
     pm->send("can", msg);
   }
@@ -229,6 +246,12 @@ std::optional<bool> send_panda_states(PubMaster *pm, Panda *panda, bool is_onroa
   if (spoofing_started) {
     health.ignition_line_pkt = 1;
   }
+
+  // BluePilot: supplement Panda ignition_can_pkt with software Ford CAN ignition detection
+  if (ford_can_ignition && (nanos_since_boot() - ford_can_ignition_time < 3e9)) {
+    health.ignition_can_pkt = 1;
+  }
+  // End BluePilot
 
   bool ignition_local = ((health.ignition_line_pkt != 0) || (health.ignition_can_pkt != 0)) && !always_offroad;
 

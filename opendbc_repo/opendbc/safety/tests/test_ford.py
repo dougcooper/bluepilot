@@ -100,6 +100,21 @@ class TestFordSafetyBase(common.CarSafetyTest):
   packer: CANPackerSafety
   safety: libsafety_py.LibSafety
 
+  # BluePilot: Ford CAN ignition hook tests (BodyInfo_3_FD1)
+  def test_ignition_on(self):
+    msg = self.packer.make_can_msg_safety("BodyInfo_3_FD1", 0, {"Ignition_Status": 4})
+    self.safety.ignition_can_hook(msg)
+    self.assertTrue(self.safety.get_ignition_can())
+
+  def test_ignition_off(self):
+    msg_on = self.packer.make_can_msg_safety("BodyInfo_3_FD1", 0, {"Ignition_Status": 4})
+    self.safety.ignition_can_hook(msg_on)
+    self.assertTrue(self.safety.get_ignition_can())
+    msg_off = self.packer.make_can_msg_safety("BodyInfo_3_FD1", 0, {"Ignition_Status": 1})
+    self.safety.ignition_can_hook(msg_off)
+    self.assertFalse(self.safety.get_ignition_can())
+  # End BluePilot
+
   def get_canfd_curvature_limits(self, speed):
     # Round it in accordance with the safety
     curvature_accel_limit = MAX_LATERAL_ACCEL / (max(speed, 1) ** 2)
